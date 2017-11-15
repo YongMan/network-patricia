@@ -114,6 +114,7 @@ int main(int argc, char **argv) {
   char ip_str[20];
   unsigned int mask;
   cidr_t cidr;
+  unsigned int h_addr;
 
   while (fgets(line, 128, fp)) {
     /*
@@ -169,16 +170,17 @@ int main(int argc, char **argv) {
      * Assign a value to the IP address and mask field for this
      * node.
      */
-    p->p_key = addr.s_addr; /* Network-byte order */
+    h_addr = ntohl(addr.s_addr);
+    p->p_key = h_addr; /* host byte order */
     p->p_m->pm_mask = cidr.mask;
     //p->p_m->pm_mask = htonl(cidr.mask);
-    pfind = pat_search(addr.s_addr, phead);
+    pfind = pat_search(h_addr, phead);
 
-    printf("key %d addr %d pm_mask 0x%x\n",p->p_key, addr.s_addr, p->p_m->pm_mask);
+    printf("key %d addr %d pm_mask 0x%x\n",p->p_key, h_addr, p->p_m->pm_mask);
     printf("pfind 0x%x key:%d mask:0x%x\n",pfind,  pfind->p_key, pfind->p_m->pm_mask);
     //if (pfind->p_key==(addr.s_addr&pfind->p_m->pm_mask)) {
-    if (pfind->p_key != 0 && (pfind->p_key&pfind->p_m->pm_mask) == (addr.s_addr & pfind->p_m->pm_mask)) {
-      printf("%08x: ", addr.s_addr);
+    if (pfind->p_key != 0 && (pfind->p_key&pfind->p_m->pm_mask) == (h_addr & pfind->p_m->pm_mask)) {
+      printf("key:%d find key:%d after mask:%d\n", addr.s_addr, pfind->p_key, h_addr & pfind->p_m->pm_mask);
       printf("Found.\n");
     } else {
 
@@ -186,7 +188,7 @@ int main(int argc, char **argv) {
       * Insert the node.
       * Returns the node it inserted on success, 0 on failure.
       */
-      printf("%08x: ", addr.s_addr);
+      printf("%d: ", h_addr);
       printf("Inserted.\n");
       p = pat_insert(p, phead);
     }
