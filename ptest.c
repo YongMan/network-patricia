@@ -36,6 +36,11 @@ struct Node {
   double bar;
 };
 
+typedef struct{
+    struct in_addr ip;
+    unsigned int mask;
+} cidr_t;
+
 
 int main(int argc, char **argv) {
   struct ptree *phead;
@@ -44,9 +49,6 @@ int main(int argc, char **argv) {
   FILE *fp;
   char line[128];
   //char addr_str[16];
-  struct in_addr addr;
-  unsigned long mask = 0xffffffff;
-  float time;
 
   if (argc < 2) {
     printf("Usage: %s <TCP stream>\n", argv[0]);
@@ -109,13 +111,21 @@ int main(int argc, char **argv) {
   /*
    * The main loop to insert nodes.
    */
+  char ip_str[20];
+  unsigned int mask;
+  cidr_t cidr;
+
   while (fgets(line, 128, fp)) {
     /*
      * Read in each IP address and mask and convert them to
      * more usable formats.
      */
-    sscanf(line, "%f %d", &time, (unsigned int *)&addr);
-    // inet_aton(addr_str, &addr);
+    sscanf(line, "%[^/]%*c%d", ip_str, &mask);
+    printf("ip_str:%s mask:%d\n", ip_str, mask);
+    inet_aton(ip_str, &cidr.ip);
+    cidr.mask = ~0 << (32 - mask);
+    struct in_addr addr = cidr.ip;
+    printf("addr is %d mask:0x%x\n", addr.s_addr, cidr.mask);
 
     /*
      * Create a Patricia trie node to insert.
@@ -160,13 +170,15 @@ int main(int argc, char **argv) {
      * node.
      */
     p->p_key = addr.s_addr; /* Network-byte order */
-    p->p_m->pm_mask = htonl(mask);
+    p->p_m->pm_mask = cidr.mask;
+    //p->p_m->pm_mask = htonl(cidr.mask);
     pfind = pat_search(addr.s_addr, phead);
 
-    // printf("%08x %08x %08x\n",p->p_key, addr.s_addr, p->p_m->pm_mask);
-    // if (pfind->p_key==(addr.s_addr&pfind->p_m->pm_mask))
-    if (pfind->p_key == addr.s_addr) {
-      printf("%f %08x: ", time, addr.s_addr);
+    printf("key %d addr %d pm_mask 0x%x\n",p->p_key, addr.s_addr, p->p_m->pm_mask);
+    printf("pfind 0x%x key:%d mask:0x%x\n",pfind,  pfind->p_key, pfind->p_m->pm_mask);
+    //if (pfind->p_key==(addr.s_addr&pfind->p_m->pm_mask)) {
+    if (pfind->p_key != 0 && (pfind->p_key&pfind->p_m->pm_mask) == (addr.s_addr & pfind->p_m->pm_mask)) {
+      printf("%08x: ", addr.s_addr);
       printf("Found.\n");
     } else {
 
@@ -174,8 +186,8 @@ int main(int argc, char **argv) {
       * Insert the node.
       * Returns the node it inserted on success, 0 on failure.
       */
-      // printf("%08x: ", addr.s_addr);
-      // printf("Inserted.\n");
+      printf("%08x: ", addr.s_addr);
+      printf("Inserted.\n");
       p = pat_insert(p, phead);
     }
 
